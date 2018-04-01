@@ -11,31 +11,19 @@ const (
 	isDispatching
 )
 
-type sub struct {
-	f   Listener
-	res chan<- int
-}
-
-type unsub struct {
-	id   int
-	done chan struct{}
-}
-
 type act struct {
 	a    Action
 	done chan Action
 }
 
 type store struct {
-	n                          int
-	state                      State
-	stop                       chan struct{}
-	events                     chan act
-	subs                       chan sub
-	unsubs                     chan unsub
-	listeners                  atomic.Value
-	reducer                    atomic.Value
-	lsLock, redLock, stateLock sync.RWMutex
+	n                 int
+	state             State
+	stop              chan struct{}
+	events            chan act
+	listeners         atomic.Value
+	reducer           atomic.Value
+	lsLock, stateLock sync.RWMutex
 }
 
 var _ Store = (*store)(nil)

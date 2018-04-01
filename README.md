@@ -1,6 +1,6 @@
 # redux
 
-A idiomatic Go implementation of [Redux](https://redux.js.org) state management
+Idiomatic Go implementation of [Redux](https://redux.js.org) state management
 pattern.
 
 Highlights:
