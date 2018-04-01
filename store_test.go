@@ -8,25 +8,21 @@ import (
 	"github.com/andviro/redux"
 )
 
-type testState struct {
-	N int
-}
-
 func TestStore(t *testing.T) {
 	var stateHistory []int
 	reducer := func(s redux.State, a redux.Action) redux.State {
-		st := s.(testState)
+		st := s.(int)
 		switch t := a.(type) {
 		case int:
-			return testState{st.N + t}
+			return st + t
 		}
 		return st
 	}
-	s := redux.New(reducer, testState{10})
+	s := redux.New(reducer, 10)
 	cancel := s.Subscribe(func() {
-		st := s.GetState().(testState)
+		st := s.GetState().(int)
 		t.Logf("%+v", st)
-		stateHistory = append(stateHistory, st.N)
+		stateHistory = append(stateHistory, st)
 	})
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -39,8 +35,8 @@ func TestStore(t *testing.T) {
 	wg.Wait()
 	cancel()
 	cancel = s.Subscribe(func() {
-		tst := s.GetState().(testState)
-		if tst.N != 120 {
+		tst := s.GetState().(int)
+		if tst != 120 {
 			t.Error("invalid state", tst)
 		}
 	})
@@ -55,14 +51,14 @@ func TestStore(t *testing.T) {
 func TestDispatchInListener(t *testing.T) {
 	var store redux.Store
 	reducer := func(s redux.State, a redux.Action) (res redux.State) {
-		st := s.(testState)
+		st := s.(int)
 		switch t := a.(type) {
 		case int:
-			return testState{st.N + t}
+			return st + t
 		}
 		return st
 	}
-	store = redux.New(reducer, testState{})
+	store = redux.New(reducer, 0)
 	var cancel func()
 	cancel = store.Subscribe(func() {
 		go store.Dispatch(1)
@@ -74,26 +70,26 @@ func TestDispatchInListener(t *testing.T) {
 func TestDispatchInReduce(t *testing.T) {
 	var store redux.Store
 	reducer := func(s redux.State, a redux.Action) (res redux.State) {
-		st := s.(testState)
+		st := s.(int)
 		switch t := a.(type) {
 		case int:
-			res = testState{st.N + t} // so that result is returned
+			res = st + t // so that result is returned
 			go store.Dispatch(2)
 			return
 		}
 		return st
 	}
-	store = redux.New(reducer, testState{})
+	store = redux.New(reducer, 0)
 	finish := make(chan struct{})
 	cancel := store.Subscribe(func() {
-		if store.GetState().(testState).N > 1 {
+		if store.GetState().(int) > 1 {
 			close(finish)
 		}
 	})
 	defer cancel()
 	store.Dispatch(1)
 	<-finish
-	if store.GetState().(testState).N != 3 {
+	if store.GetState().(int) != 3 {
 		t.Error("invalid state", store.GetState())
 	}
 }
@@ -103,19 +99,19 @@ func TestSubscribeInReduce(t *testing.T) {
 	var cancel func()
 	var n int
 	reducer := func(s redux.State, a redux.Action) (res redux.State) {
-		st := s.(testState)
+		st := s.(int)
 		switch t := a.(type) {
 		case int:
 			cancel = store.Subscribe(func() {
 				n++
 			})
-			return testState{st.N + t} // so that result is returned
+			return st + t // so that result is returned
 		case string:
 			cancel()
 		}
 		return st
 	}
-	store = redux.New(reducer, testState{})
+	store = redux.New(reducer, 0)
 	store.Dispatch(1)
 	store.Dispatch("1")
 	store.Dispatch("2")
