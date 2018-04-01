@@ -57,10 +57,10 @@ func New(reducer Reducer, state State) Store {
 			case <-res.stop:
 				return
 			case action := <-res.events:
+				reducer := res.reducer.Load().(Reducer)
 				func() {
 					res.stateLock.Lock()
 					defer res.stateLock.Unlock()
-					reducer := res.reducer.Load().(Reducer)
 					res.state = reducer(res.state, action.a)
 				}()
 				ls := res.listeners.Load().(listeners)
@@ -121,6 +121,7 @@ func (s *store) Dispatch(action Action) Action {
 	case <-s.stop:
 		return action
 	case s.events <- a:
-		return <-a.done
+		break
 	}
+	return <-a.done
 }
