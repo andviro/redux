@@ -24,6 +24,7 @@ type store struct {
 	listeners         atomic.Value
 	reducer           atomic.Value
 	lsLock, stateLock sync.RWMutex
+	dispatcher        Dispatcher
 }
 
 var _ Store = (*store)(nil)
@@ -31,7 +32,7 @@ var _ Store = (*store)(nil)
 type listeners map[int]Listener
 
 // New creates a Store and initializes it with state and default reducer
-func New(reducer Reducer, state State) Store {
+func New(reducer Reducer, state State, mws ...Middleware) Store {
 	res := &store{
 		state:  state,
 		stop:   make(chan struct{}),
@@ -39,6 +40,10 @@ func New(reducer Reducer, state State) Store {
 	}
 	res.reducer.Store(reducer)
 	res.listeners.Store((listeners)(nil))
+	res.dispatcher = res.dispatch
+	for i := len(mws) - 1; i >= 0; i-- {
+		res.dispatcher = mws[i](res.dispatcher)
+	}
 	go func() {
 		for {
 			select {
@@ -103,7 +108,7 @@ func (s *store) Subscribe(f Listener) UnsubscribeFunc {
 	return s.unsub(id)
 }
 
-func (s *store) Dispatch(action Action) Action {
+func (s *store) dispatch(action Action) Action {
 	a := act{a: action, done: make(chan Action)}
 	select {
 	case <-s.stop:
@@ -112,4 +117,8 @@ func (s *store) Dispatch(action Action) Action {
 		break
 	}
 	return <-a.done
+}
+
+func (s *store) Dispatch(action Action) Action {
+	return s.dispatcher(action)
 }

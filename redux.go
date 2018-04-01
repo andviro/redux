@@ -16,6 +16,18 @@ type Listener func()
 // UnsubscribeFunc must be called to remove subscription
 type UnsubscribeFunc func()
 
+// Dispatcher receives the action and returns it, possibly modified
+type Dispatcher func(Action) Action
+
+// Middleware constructs Dispatcher from another Dispatcher
+type Middleware func(Dispatcher) Dispatcher
+
+// Thunk conditionally applies dispatcher to action
+type Thunk func(Dispatcher) Action
+
+// Factory creates Dispatcher from Action
+type Factory func(Action) Dispatcher
+
 // Store is a redux store
 type Store interface {
 	Dispatch(Action) Action             // Send action to modify store
