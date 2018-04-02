@@ -17,14 +17,14 @@ type act struct {
 }
 
 type store struct {
-	n                 int
-	state             State
-	stop              chan struct{}
-	events            chan act
-	listeners         atomic.Value
-	reducer           atomic.Value
-	lsLock, stateLock sync.RWMutex
-	dispatcher        Dispatcher
+	n          int
+	state      atomic.Value
+	stop       chan struct{}
+	events     chan act
+	listeners  atomic.Value
+	reducer    atomic.Value
+	lsLock     sync.RWMutex
+	dispatcher Dispatcher
 }
 
 var _ Store = (*store)(nil)
@@ -34,10 +34,10 @@ type listeners map[int]Listener
 // New creates a Store and initializes it with state and default reducer
 func New(reducer Reducer, state State, mws ...Middleware) Store {
 	res := &store{
-		state:  state,
 		stop:   make(chan struct{}),
 		events: make(chan act),
 	}
+	res.state.Store(state)
 	res.reducer.Store(reducer)
 	res.listeners.Store((listeners)(nil))
 	res.dispatcher = res.dispatch
@@ -51,11 +51,7 @@ func New(reducer Reducer, state State, mws ...Middleware) Store {
 				return
 			case action := <-res.events:
 				reducer := res.reducer.Load().(Reducer)
-				func() {
-					res.stateLock.Lock()
-					defer res.stateLock.Unlock()
-					res.state = reducer(res.state, action.a)
-				}()
+				res.state.Store(reducer(res.state.Load(), action.a))
 				ls := res.listeners.Load().(listeners)
 				for _, l := range ls {
 					l()
@@ -72,9 +68,7 @@ func (s *store) ReplaceReducer(r Reducer) {
 }
 
 func (s *store) GetState() State {
-	s.stateLock.RLock()
-	defer s.stateLock.RUnlock()
-	return s.state
+	return s.state.Load()
 }
 
 func (s *store) unsub(id int) func() {

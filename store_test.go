@@ -1,9 +1,11 @@
 package redux_test
 
 import (
+	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/andviro/redux"
 )
@@ -117,5 +119,45 @@ func TestSubscribeInReduce(t *testing.T) {
 	store.Dispatch("2")
 	if n != 1 {
 		t.Error("invalid n", n)
+	}
+}
+
+func TestDispatch_Randomized(t *testing.T) {
+	var wg sync.WaitGroup
+	results := make(map[int]bool)
+	store := redux.New(func(s redux.State, a redux.Action) redux.State {
+		st := s.(int)
+		switch t := a.(type) {
+		case int:
+			st = t
+		}
+		return st
+	}, 0)
+	store.Subscribe(func() {
+		results[store.GetState().(int)] = true
+	})
+	for i := 0; i < 10000; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+			store.Dispatch(i)
+		}(i)
+	}
+	wg.Wait()
+	if len(results) != 10000 {
+		t.Error("invalid result", len(results))
+	}
+	sum := 0
+	m := make(map[int]bool)
+	for k := range results {
+		if m[k] {
+			t.Error("duplicate event", k)
+		}
+		sum += k
+		m[k] = true
+	}
+	if sum != 49995000 {
+		t.Error(sum)
 	}
 }
