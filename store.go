@@ -5,13 +5,7 @@ import (
 	"sync/atomic"
 )
 
-const (
-	isIdle = iota
-	isReducing
-	isDispatching
-)
-
-type act struct {
+type action struct {
 	a    Action
 	done chan Action
 }
@@ -19,61 +13,37 @@ type act struct {
 type store struct {
 	n         int
 	state     atomic.Value
-	stop      chan struct{}
-	events    chan act
+	actions   chan action
 	listeners atomic.Value
 	reducer   atomic.Value
 	lsLock    sync.RWMutex
-}
-
-type withDispatch struct {
-	Store
-	dispatcher Dispatcher
-}
-
-func (wd *withDispatch) Dispatch(a Action) Action {
-	return wd.dispatcher(a)
 }
 
 var _ Store = (*store)(nil)
 
 type listeners map[int]Listener
 
-// ApplyMiddleware returns new store with modified middleware chain
-func ApplyMiddleware(store Store, mws ...Middleware) Store {
-	if len(mws) == 0 {
-		return store
-	}
-	res := &withDispatch{Store: store, dispatcher: store.Dispatch}
-	for i := len(mws) - 1; i >= 0; i-- {
-		res.dispatcher = mws[i](res.dispatcher)
-	}
-	return res
-}
-
 // New creates a Store and initializes it with state and default reducer
 func New(reducer Reducer, state State, mws ...Middleware) Store {
-	res := &store{
-		stop:   make(chan struct{}),
-		events: make(chan act),
-	}
+	res := new(store)
+	res.actions = make(chan action)
 	res.state.Store(state)
 	res.reducer.Store(reducer)
 	res.listeners.Store((listeners)(nil))
 	go func() {
-		for {
-			select {
-			case <-res.stop:
-				return
-			case action := <-res.events:
-				reducer := res.reducer.Load().(Reducer)
-				res.state.Store(reducer(res.state.Load(), action.a))
-				ls := res.listeners.Load().(listeners)
-				for _, l := range ls {
-					l()
-				}
-				action.done <- action.a
+		defer close(res.actions)
+		for action := range res.actions {
+			if _, ok := action.a.(stop); ok {
+				close(action.done)
+				break
 			}
+			reducer := res.reducer.Load().(Reducer)
+			res.state.Store(reducer(res.state.Load(), action.a))
+			ls := res.listeners.Load().(listeners)
+			for _, l := range ls {
+				l()
+			}
+			action.done <- action.a
 		}
 	}()
 	return ApplyMiddleware(res, mws...)
@@ -118,13 +88,8 @@ func (s *store) Subscribe(f Listener) UnsubscribeFunc {
 	return s.unsub(id)
 }
 
-func (s *store) Dispatch(action Action) Action {
-	a := act{a: action, done: make(chan Action)}
-	select {
-	case <-s.stop:
-		return action
-	case s.events <- a:
-		break
-	}
-	return <-a.done
+func (s *store) Dispatch(a Action) Action {
+	action := action{a: a, done: make(chan Action)}
+	s.actions <- action
+	return <-action.done
 }

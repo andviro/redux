@@ -161,3 +161,22 @@ func TestDispatch_Randomized(t *testing.T) {
 		t.Error(sum)
 	}
 }
+
+func TestStop(t *testing.T) {
+	store := redux.New(func(s redux.State, a redux.Action) redux.State {
+		switch t := a.(type) {
+		case bool:
+			return !t
+		}
+		return s
+	}, false)
+	store.Dispatch(true)
+	defer func() {
+		e := recover()
+		if e == nil {
+			t.Errorf("should panic here")
+		}
+	}()
+	store.Dispatch(redux.Stop)
+	store.Dispatch(false)
+}

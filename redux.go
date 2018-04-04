@@ -1,4 +1,4 @@
-// Package redux implements Redux store pattern in Go way
+// Package redux implements Redux store pattern in a Go way
 package redux
 
 // State is an arbitrary Go value
@@ -25,8 +25,10 @@ type Middleware func(Dispatcher) Dispatcher
 // Thunk conditionally applies dispatcher to action
 type Thunk func(Dispatcher) Action
 
-// Factory creates Dispatcher from Action
-type Factory func(Action) Dispatcher
+type stop struct{}
+
+// Stop shuts down store when dispatched
+var Stop stop
 
 // Store is a redux store
 type Store interface {
