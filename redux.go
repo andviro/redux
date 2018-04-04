@@ -20,10 +20,10 @@ type UnsubscribeFunc func()
 type Dispatcher func(Action) Action
 
 // Middleware constructs Dispatcher from another Dispatcher
-type Middleware func(Dispatcher) Dispatcher
+type Middleware func(Store, Dispatcher) Dispatcher
 
 // Thunk conditionally applies dispatcher to action
-type Thunk func(Dispatcher) Action
+type Thunk func(Dispatcher, func() State) Action
 
 type stop struct{}
 

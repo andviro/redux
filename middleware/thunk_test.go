@@ -17,7 +17,7 @@ func TestThunk(t *testing.T) {
 		return st
 	}
 	increment := func(n int) redux.Thunk {
-		return func(dispatch redux.Dispatcher) redux.Action {
+		return func(dispatch redux.Dispatcher, _ func() redux.State) redux.Action {
 			if n > 0 {
 				return dispatch(1)
 			}

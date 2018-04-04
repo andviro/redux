@@ -16,7 +16,7 @@ func ApplyMiddleware(store Store, mws ...Middleware) Store {
 	}
 	res := &withDispatch{Store: store, dispatcher: store.Dispatch}
 	for i := len(mws) - 1; i >= 0; i-- {
-		res.dispatcher = mws[i](res.dispatcher)
+		res.dispatcher = mws[i](res, res.dispatcher)
 	}
 	return res
 }
