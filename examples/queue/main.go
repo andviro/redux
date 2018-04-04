@@ -24,7 +24,7 @@ type queue struct {
 
 type take chan event
 
-func (q queue) Enqueue(payload string) queue {
+func (q queue) enqueue(payload string) queue {
 	buf := make([]event, len(q.buf)+1)
 	copy(buf, q.buf)
 	q.id++
@@ -34,7 +34,7 @@ func (q queue) Enqueue(payload string) queue {
 	return q
 }
 
-func (q queue) Dequeue(id int) queue {
+func (q queue) dequeue(id int) queue {
 	var buf []event
 	for _, evt := range q.buf {
 		if evt.id == id {
@@ -46,6 +46,7 @@ func (q queue) Dequeue(id int) queue {
 	return q
 }
 
+// Emit sends event to sink or buffer
 func Emit(event string) redux.Thunk {
 	return func(dispatch redux.Dispatcher, getState func() redux.State) redux.Action {
 		q := getState().(queue)
@@ -59,6 +60,7 @@ func Emit(event string) redux.Thunk {
 	}
 }
 
+// Sink subscribes function to event
 func Sink(sink sink) redux.Thunk {
 	return func(dispatch redux.Dispatcher, getState func() redux.State) redux.Action {
 		dispatch(sink)
@@ -73,7 +75,7 @@ func Sink(sink sink) redux.Thunk {
 	}
 }
 
-func (q queue) AddSink(t sink) queue {
+func (q queue) addSink(t sink) queue {
 	sinks := make([]sink, len(q.sinks)+1)
 	copy(sinks, q.sinks)
 	sinks[len(q.sinks)] = t
@@ -81,16 +83,17 @@ func (q queue) AddSink(t sink) queue {
 	return q
 }
 
-func newQ() redux.Store {
+// NewQ creates queue based on redux.Store
+func NewQ() redux.Store {
 	res := redux.New(func(prev redux.State, a redux.Action) redux.State {
 		q := prev.(queue)
 		switch t := a.(type) {
 		case sink:
-			q = q.AddSink(t)
+			q = q.addSink(t)
 		case string:
-			q = q.Enqueue(t)
+			q = q.enqueue(t)
 		case int:
-			q = q.Dequeue(t)
+			q = q.dequeue(t)
 		}
 		return q
 	}, queue{}, middleware.Thunk)
@@ -98,7 +101,7 @@ func newQ() redux.Store {
 }
 
 func main() {
-	q := newQ()
+	q := NewQ()
 	q.Dispatch(Emit("hello"))
 	q.Dispatch(Emit("world"))
 	q.Dispatch(Emit("i"))
