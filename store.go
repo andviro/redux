@@ -17,19 +17,39 @@ type act struct {
 }
 
 type store struct {
-	n          int
-	state      atomic.Value
-	stop       chan struct{}
-	events     chan act
-	listeners  atomic.Value
-	reducer    atomic.Value
-	lsLock     sync.RWMutex
+	n         int
+	state     atomic.Value
+	stop      chan struct{}
+	events    chan act
+	listeners atomic.Value
+	reducer   atomic.Value
+	lsLock    sync.RWMutex
+}
+
+type withDispatch struct {
+	Store
 	dispatcher Dispatcher
+}
+
+func (wd *withDispatch) Dispatch(a Action) Action {
+	return wd.dispatcher(a)
 }
 
 var _ Store = (*store)(nil)
 
 type listeners map[int]Listener
+
+// ApplyMiddleware returns new store with modified middleware chain
+func ApplyMiddleware(store Store, mws ...Middleware) Store {
+	if len(mws) == 0 {
+		return store
+	}
+	res := &withDispatch{Store: store, dispatcher: store.Dispatch}
+	for i := len(mws) - 1; i >= 0; i-- {
+		res.dispatcher = mws[i](res.dispatcher)
+	}
+	return res
+}
 
 // New creates a Store and initializes it with state and default reducer
 func New(reducer Reducer, state State, mws ...Middleware) Store {
@@ -40,10 +60,6 @@ func New(reducer Reducer, state State, mws ...Middleware) Store {
 	res.state.Store(state)
 	res.reducer.Store(reducer)
 	res.listeners.Store((listeners)(nil))
-	res.dispatcher = res.dispatch
-	for i := len(mws) - 1; i >= 0; i-- {
-		res.dispatcher = mws[i](res.dispatcher)
-	}
 	go func() {
 		for {
 			select {
@@ -60,7 +76,7 @@ func New(reducer Reducer, state State, mws ...Middleware) Store {
 			}
 		}
 	}()
-	return res
+	return ApplyMiddleware(res, mws...)
 }
 
 func (s *store) ReplaceReducer(r Reducer) {
@@ -102,7 +118,7 @@ func (s *store) Subscribe(f Listener) UnsubscribeFunc {
 	return s.unsub(id)
 }
 
-func (s *store) dispatch(action Action) Action {
+func (s *store) Dispatch(action Action) Action {
 	a := act{a: action, done: make(chan Action)}
 	select {
 	case <-s.stop:
@@ -111,8 +127,4 @@ func (s *store) dispatch(action Action) Action {
 		break
 	}
 	return <-a.done
-}
-
-func (s *store) Dispatch(action Action) Action {
-	return s.dispatcher(action)
 }
