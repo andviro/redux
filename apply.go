@@ -10,13 +10,17 @@ func (wd *withDispatch) Dispatch(a Action) Action {
 }
 
 // ApplyMiddleware returns new store with modified middleware chain
-func ApplyMiddleware(store Store, mws ...Middleware) Store {
+func ApplyMiddleware(store Store, mws ...MiddlewareFactory) Store {
 	if len(mws) == 0 {
 		return store
 	}
-	res := &withDispatch{Store: store, dispatcher: store.Dispatch}
+	var dispatcher = store.Dispatch
+	res := &withDispatch{Store: store, dispatcher: func(Action) Action {
+		panic("dispatch while applying middleware")
+	}}
 	for i := len(mws) - 1; i >= 0; i-- {
-		res.dispatcher = mws[i](res, res.dispatcher)
+		dispatcher = mws[i](res)(dispatcher)
 	}
+	res.dispatcher = dispatcher
 	return res
 }

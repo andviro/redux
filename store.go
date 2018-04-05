@@ -24,7 +24,7 @@ var _ Store = (*store)(nil)
 type listeners map[int]Listener
 
 // New creates a Store and initializes it with state and default reducer
-func New(reducer Reducer, state State, mws ...Middleware) Store {
+func New(reducer Reducer, state State, mws ...MiddlewareFactory) Store {
 	res := new(store)
 	res.actions = make(chan action)
 	res.state.Store(state)

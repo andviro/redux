@@ -20,7 +20,16 @@ type UnsubscribeFunc func()
 type Dispatcher func(Action) Action
 
 // Middleware constructs Dispatcher from another Dispatcher
-type Middleware func(Store, Dispatcher) Dispatcher
+type Middleware func(Dispatcher) Dispatcher
+
+// GetStateDispatcher represents limited store interface
+type GetStateDispatcher interface {
+	Dispatch(Action) Action // Send action to modify store
+	GetState() State        // Get current state
+}
+
+// MiddlewareFactory creates middleware using supplied store
+type MiddlewareFactory func(GetStateDispatcher) Middleware
 
 // Thunk conditionally applies dispatcher to action
 type Thunk func(Dispatcher, func() State) Action
@@ -32,9 +41,8 @@ var Stop stop
 
 // Store is a redux store
 type Store interface {
-	Dispatch(Action) Action             // Send action to modify store
+	GetStateDispatcher
 	Subscribe(Listener) UnsubscribeFunc // Subscribe to store changes
-	GetState() State                    // Get current state
 	ReplaceReducer(Reducer)             // Set new reducer
 }
 
