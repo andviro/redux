@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/andviro/redux"
 	"github.com/andviro/redux/middleware"
@@ -20,6 +21,7 @@ type queue struct {
 	id    int
 	buf   []event
 	sinks []sink
+	l     *sync.RWMutex
 }
 
 type take chan event
@@ -53,6 +55,8 @@ func Emit(event string) redux.Thunk {
 		if len(q.sinks) == 0 {
 			return dispatch(event)
 		}
+		q.l.RLock()
+		defer q.l.RUnlock()
 		for _, sink := range q.sinks {
 			sink(event)
 		}
@@ -65,6 +69,8 @@ func Sink(sink sink) redux.Thunk {
 	return func(dispatch redux.Dispatcher, getState func() redux.State) redux.Action {
 		dispatch(sink)
 		q := getState().(queue)
+		q.l.Lock()
+		defer q.l.Unlock()
 		for _, ev := range q.buf {
 			dispatch(ev.id)
 			for _, sink := range q.sinks {
@@ -83,6 +89,10 @@ func (q queue) addSink(t sink) queue {
 	return q
 }
 
+func newQ() queue {
+	return queue{l: new(sync.RWMutex)}
+}
+
 // NewQ creates queue based on redux.Store
 func NewQ() redux.Store {
 	res := redux.New(func(prev redux.State, a redux.Action) redux.State {
@@ -96,7 +106,7 @@ func NewQ() redux.Store {
 			q = q.dequeue(t)
 		}
 		return q
-	}, queue{}, middleware.Thunk)
+	}, newQ(), middleware.Thunk)
 	return res
 }
 
